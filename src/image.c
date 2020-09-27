@@ -26,6 +26,10 @@ internal u32* get_pixel_pointer(Image_u32 image, u32 x, u32 y) {
     return result;
 }
 
+internal void set_pixel(Image_u32 image, u32 x, u32 y, Color_ARGB color) {
+    image.pixels[y*image.width + x] = color.argb;
+}
+
 internal void write_image(char* file_name, Image_u32 image) {
     u32 pixel_size = get_total_pixel_size(image);
     
@@ -61,7 +65,7 @@ internal Image_u32 allocate_image(u32 width, u32 height) {
     image.height = height;
     
     u32 pixel_size = get_total_pixel_size(image);
-    image.pixels = (u32*)calloc(pixel_size, 1);
+    image.pixels = (u32*)malloc(pixel_size);
     
     return image;
 }
@@ -73,4 +77,3 @@ internal void clear_image(Image_u32 image, Color_ARGB color) {
         *at++ = color.argb;
     }
 }
-    

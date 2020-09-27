@@ -1,6 +1,7 @@
 /* date = September 27th 2020 4:45 pm */
 
 #ifndef OBJ_H
+#define OBJ_H
 
 typedef union Triangle {
     struct {
@@ -16,7 +17,5 @@ typedef struct Mesh {
     u32 triangle_count;
     Triangle* triangles;
 } Mesh;
-
-#define OBJ_H
 
 #endif //OBJ_H
