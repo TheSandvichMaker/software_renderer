@@ -26,9 +26,9 @@ internal u32* get_pixel_pointer(Image_u32* image, u32 x, u32 y) {
     return result;
 }
 
-internal Color_ARGB get_pixel(Image_u32* image, u32 x, u32 y) {
+internal u32 get_pixel(Image_u32* image, u32 x, u32 y) {
     u32 result = image->pixels[y*image->width + x];
-    return (Color_ARGB) { .argb = result };
+    return result;
 }
 
 internal void set_pixel(Image_u32* image, u32 x, u32 y, Color_ARGB color) {

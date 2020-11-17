@@ -168,20 +168,23 @@ internal u32 u32_log2(u32 n) {
 #undef S
 }
 
-internal void voronoi_test() {
-    enum { N = 512 };
+internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplier) {
+    Image_u32 temp_image_a = allocate_image(src->width, src->height);
+    Image_u32 temp_image_b = allocate_image(src->width, src->height);
     
-    Image_u32 image_a = allocate_image(N, N);
-    Image_u32 image_b = allocate_image(N, N);
+    Image_u32* image_read  = &temp_image_a;
+    Image_u32* image_write = &temp_image_b;
     
-    set_pixel(&image_a, 16*8, 16*16,  (Color_ARGB) { .bg = 16*8,  .ra = 16*16 });
-    set_pixel(&image_a, 16*2, 16*18,  (Color_ARGB) { .bg = 16*2,  .ra = 16*18 });
-    set_pixel(&image_a, 16*25, 16*28, (Color_ARGB) { .bg = 16*25, .ra = 16*28 });
-    set_pixel(&image_a, 16*12, 16*6,  (Color_ARGB) { .bg = 16*12, .ra = 16*6  });
+    for (u32 y = 0; y < image_read->height; ++y) {
+        for (u32 x = 0; x < image_read->width; ++x) {
+            Color_ARGB pixel = (Color_ARGB) { .argb = get_pixel(src, x, y) };
+            if (pixel.a > 127) {
+                set_pixel(image_read, x, y, (Color_ARGB) { .bg = x, .ra = y });
+            }
+        }
+    }
     
-    Image_u32* image_read  = &image_a;
-    Image_u32* image_write = &image_b;
-    
+    u32 N = Max(src->width, src->height);
     u32 N_log2 = u32_log2(N);
     for (u32 pass_index = 0; pass_index < N_log2; ++pass_index) {
         s32 offset = (s32)(1 << (N_log2 - pass_index - 1));
@@ -206,7 +209,7 @@ internal void voronoi_test() {
                     if (read_y < 0)                        { read_y = 0; }
                     if (read_y >= (s32)image_read->height) { read_y = image_read->height - 1; }
                     
-                    Color_ARGB pixel = get_pixel(image_read, read_x, read_y);
+                    Color_ARGB pixel = { .argb = get_pixel(image_read, read_x, read_y) };
                     if (pixel.bg || pixel.ra) {
                         s32 diff_x = (s32)pixel.bg - (s32)x;
                         s32 diff_y = (s32)pixel.ra - (s32)y;
@@ -231,23 +234,90 @@ internal void voronoi_test() {
         Swap(Image_u32*, image_read, image_write);
     }
     
-    write_image("voronoi.bmp", image_read);
+    Image_u32 result = allocate_image(src->width, src->height);
     
     for (u32 y = 0; y < image_read->height; ++y) {
         for (u32 x = 0; x < image_read->width; ++x) {
-            Color_ARGB pixel = get_pixel(image_read, x, y);
+            Color_ARGB pixel = { .argb = get_pixel(image_read, x, y) };
             s32 diff_x = (s32)pixel.bg - (s32)x;
             s32 diff_y = (s32)pixel.ra - (s32)y;
             u32 distance_sq = diff_x*diff_x + diff_y*diff_y;
             f32 distance = sqrt((f32)distance_sq);
-            u32 write_distance = (u32)(255*(distance / (f32)N));
+            s32 write_distance = bullshit_multiplier*(u32)(255*(distance / (f32)N));
             if (write_distance < 0)   { write_distance = 0; }
             if (write_distance > 255) { write_distance = 255; }
-            set_pixel(image_write, x, y, rgb(write_distance, write_distance, write_distance));
+            set_pixel(&result, x, y, rgb(write_distance, write_distance, write_distance));
         }
     }
     
-    write_image("distance_field.bmp", image_write);
+    free_image(image_read);
+    free_image(image_write);
+    
+    return result;
+}
+
+internal void voronoi_test() {
+    enum { N = 512 };
+    Image_u32 image_source = allocate_image(N, N);
+    clear_image(&image_source, (Color_ARGB) { .a = 255 });
+    
+    char a[] = {
+        0, 0, 1, 0, 0,
+        0, 1, 0, 1, 0,
+        1, 0, 0, 0, 1,
+        1, 1, 1, 1, 1,
+        1, 0, 0, 0, 1,
+    };
+    
+    u32 margin = 128;
+    for (u32 y = margin; y < image_source.height - margin; ++y) {
+        for (u32 x = margin; x < image_source.width - margin; ++x) {
+            u32 read_x = 5*(x - margin) / (image_source.width - 2*margin);
+            u32 read_y = 4 - 5*(y - margin) / (image_source.height - 2*margin);
+            char read_pixel = a[read_y*5 + read_x];
+            if (read_pixel) {
+                set_pixel(&image_source, x, y, (Color_ARGB) { .r = 255, .g = 255, .b = 255, .a = 255 });
+            }
+        }
+    }
+    
+    write_image("A.bmp", &image_source);
+    
+    Image_u32 positive_distance_field = produce_distance_field(&image_source, 8);
+    for (u32 y = 0; y < positive_distance_field.height; ++y) {
+        for (u32 x = 0; x < positive_distance_field.width; ++x) {
+            Color_ARGB* pixel = (Color_ARGB*)get_pixel_pointer(&positive_distance_field, x, y);
+            pixel->r = (255 - pixel->r);
+            pixel->g = (255 - pixel->g);
+            pixel->b = (255 - pixel->b);
+        }
+    }
+    
+    
+    for (u32 y = 0; y < image_source.height; ++y) {
+        for (u32 x = 0; x < image_source.width; ++x) {
+            Color_ARGB* pixel = (Color_ARGB*)get_pixel_pointer(&image_source, x, y);
+            pixel->a = (255 - pixel->a);
+        }
+    }
+    
+    Image_u32 negative_distance_field = produce_distance_field(&image_source, 8);
+    
+    write_image("positive_distance_field.bmp", &positive_distance_field);
+    write_image("negative_distance_field.bmp", &negative_distance_field);
+    
+    Image_u32 sdf = allocate_image(N, N);
+    
+    for (u32 y = 0; y < sdf.height; ++y) {
+        for (u32 x = 0; x < sdf.width; ++x) {
+            u8 positive = (Color_ARGB) { .argb = get_pixel(&positive_distance_field, x, y) }.r;
+            u8 negative = (Color_ARGB) { .argb = get_pixel(&negative_distance_field, x, y) }.r;
+            u8 combined = (255 - positive) / 2 + negative / 2;
+            set_pixel(&sdf, x, y, (Color_ARGB) { .r = combined, .g = combined, .b = combined, .a = 255 });
+        }
+    }
+    
+    write_image("signed_distance_field.bmp", &sdf);
 }
 
 #include <time.h>
