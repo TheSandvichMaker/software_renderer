@@ -7,6 +7,9 @@ typedef union Color_ARGB {
     struct {
         u8 b, g, r, a;
     };
+    struct {
+        u16 bg, ra;
+    };
     u32 argb;
 } Color_ARGB;
 

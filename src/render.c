@@ -159,7 +159,7 @@ internal void draw_mesh(Image_u32* image, Mesh* mesh) {
     }
 }
 
-u32 u32_log2(u32 n) {
+internal u32 u32_log2(u32 n) {
     // https://stackoverflow.com/questions/994593/how-to-do-an-integer-log2-in-c
 #define S(k) if (n >= (1 << k)) { i += k; n >>= k; }
     u32 i = -(n == 0);
@@ -169,18 +169,15 @@ u32 u32_log2(u32 n) {
 }
 
 internal void voronoi_test() {
-    enum { N = 128 };
-    
-    u32 image_count = 0;
-    Image_u32 image_array[16] = {};
+    enum { N = 512 };
     
     Image_u32 image_a = allocate_image(N, N);
     Image_u32 image_b = allocate_image(N, N);
     
-    set_pixel(&image_a, 4*8, 4*16, rgb(4*8, 4*16, 0));
-    set_pixel(&image_a, 4*2, 4*18, rgb(4*2, 4*18, 0));
-    set_pixel(&image_a, 4*25, 4*28, rgb(4*25, 4*28, 0));
-    set_pixel(&image_a, 4*12, 4*6, rgb(4*12, 4*6, 0));
+    set_pixel(&image_a, 16*8, 16*16,  (Color_ARGB) { .bg = 16*8,  .ra = 16*16 });
+    set_pixel(&image_a, 16*2, 16*18,  (Color_ARGB) { .bg = 16*2,  .ra = 16*18 });
+    set_pixel(&image_a, 16*25, 16*28, (Color_ARGB) { .bg = 16*25, .ra = 16*28 });
+    set_pixel(&image_a, 16*12, 16*6,  (Color_ARGB) { .bg = 16*12, .ra = 16*6  });
     
     Image_u32* image_read  = &image_a;
     Image_u32* image_write = &image_b;
@@ -207,17 +204,17 @@ internal void voronoi_test() {
                     if (read_x < 0)                        { read_x = 0; }
                     if (read_x >= (s32)image_read->width)  { read_x = image_read->width - 1; }
                     if (read_y < 0)                        { read_y = 0; }
-                    if (read_y >= (s32)image_read->height) { read_x = image_read->height - 1; }
+                    if (read_y >= (s32)image_read->height) { read_y = image_read->height - 1; }
                     
                     Color_ARGB pixel = get_pixel(image_read, read_x, read_y);
-                    if (pixel.r || pixel.g) {
-                        s32 diff_x = (s32)pixel.r - (s32)x;
-                        s32 diff_y = (s32)pixel.g - (s32)y;
+                    if (pixel.bg || pixel.ra) {
+                        s32 diff_x = (s32)pixel.bg - (s32)x;
+                        s32 diff_y = (s32)pixel.ra - (s32)y;
                         u32 distance_sq = diff_x*diff_x + diff_y*diff_y;
                         if (closest_distance > distance_sq) {
                             closest_distance = distance_sq;
-                            closest_x = pixel.r;
-                            closest_y = pixel.g;
+                            closest_x = pixel.bg;
+                            closest_y = pixel.ra;
                         }
                     }
                 }
@@ -225,23 +222,13 @@ internal void voronoi_test() {
                 if ((closest_x != UINT32_MAX) &&
                     (closest_y != UINT32_MAX))
                 {
-                    set_pixel(image_write, x, y, rgb(closest_x, closest_y, 0));
+                    set_pixel(image_write, x, y, (Color_ARGB) { .bg = closest_x, .ra = closest_y });
                 }
             }
         }
         
         copy_image(image_write, image_read);
         Swap(Image_u32*, image_read, image_write);
-        
-        image_array[image_count++] = clone_image(image_read);
-    }
-    
-    for (u32 image_index = 0; image_index < image_count; ++image_index) {
-        char buf[256];
-        snprintf(buf, sizeof(buf), "debug_image_%d.bmp", image_index);
-        
-        write_image(buf, &image_array[image_index]);
-        free_image(&image_array[image_index]);
     }
     
     write_image("voronoi.bmp", image_read);
@@ -249,8 +236,8 @@ internal void voronoi_test() {
     for (u32 y = 0; y < image_read->height; ++y) {
         for (u32 x = 0; x < image_read->width; ++x) {
             Color_ARGB pixel = get_pixel(image_read, x, y);
-            s32 diff_x = (s32)pixel.r - (s32)x;
-            s32 diff_y = (s32)pixel.g - (s32)y;
+            s32 diff_x = (s32)pixel.bg - (s32)x;
+            s32 diff_y = (s32)pixel.ra - (s32)y;
             u32 distance_sq = diff_x*diff_x + diff_y*diff_y;
             f32 distance = sqrt((f32)distance_sq);
             u32 write_distance = (u32)(255*(distance / (f32)N));
