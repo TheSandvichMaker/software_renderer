@@ -168,7 +168,12 @@ internal u32 u32_log2(u32 n) {
 #undef S
 }
 
-internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplier) {
+typedef enum DistanceFieldType {
+    DistanceField_Outer,
+    DistanceField_Inner,
+} DistanceFieldType;
+
+internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplier, DistanceFieldType type) {
     Image_u32 temp_image_a = allocate_image(src->width, src->height);
     Image_u32 temp_image_b = allocate_image(src->width, src->height);
     
@@ -178,7 +183,9 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
     for (u32 y = 0; y < image_read->height; ++y) {
         for (u32 x = 0; x < image_read->width; ++x) {
             Color_ARGB pixel = (Color_ARGB) { .argb = get_pixel(src, x, y) };
-            if (pixel.a > 127) {
+            if (((type == DistanceField_Outer) && (pixel.a > 127)) ||
+                ((type == DistanceField_Inner) && (pixel.a <= 127)))
+            {
                 set_pixel(image_read, x, y, (Color_ARGB) { .bg = x, .ra = y });
             }
         }
@@ -234,8 +241,6 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
         Swap(Image_u32*, image_read, image_write);
     }
     
-    Image_u32 result = allocate_image(src->width, src->height);
-    
     for (u32 y = 0; y < image_read->height; ++y) {
         for (u32 x = 0; x < image_read->width; ++x) {
             Color_ARGB pixel = { .argb = get_pixel(image_read, x, y) };
@@ -246,14 +251,34 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
             s32 write_distance = bullshit_multiplier*(u32)(255*(distance / (f32)N));
             if (write_distance < 0)   { write_distance = 0; }
             if (write_distance > 255) { write_distance = 255; }
-            set_pixel(&result, x, y, rgb(write_distance, write_distance, write_distance));
+            write_distance = (255 - write_distance);
+            set_pixel(image_write, x, y, rgb(write_distance, write_distance, write_distance));
         }
     }
     
     free_image(image_read);
-    free_image(image_write);
-    
+
+    Image_u32 result = *image_write;
     return result;
+}
+
+internal Image_u32 produce_signed_distance_field(Image_u32* src, u32 bullshit_multiplier) {
+    Image_u32 positive_distance_field = produce_distance_field(src, 8, DistanceField_Outer);
+    Image_u32 negative_distance_field = produce_distance_field(src, 8, DistanceField_Inner);
+    
+    for (u32 y = 0; y < positive_distance_field.height; ++y) {
+        for (u32 x = 0; x < positive_distance_field.width; ++x) {
+            u8 positive = (Color_ARGB) { .argb = get_pixel(&positive_distance_field, x, y) }.r;
+            u8 negative = (Color_ARGB) { .argb = get_pixel(&negative_distance_field, x, y) }.r;
+            u8 combined = (255 - positive) / 2 + negative / 2;
+            // NOTE: We're overwriting the contents of positive_distance_field, but this is fine because we're not reading from this position again
+            set_pixel(&positive_distance_field, x, y, (Color_ARGB) { .r = combined, .g = combined, .b = combined, .a = 255 });
+        }
+    }
+
+    free_image(&negative_distance_field);
+
+    return positive_distance_field;
 }
 
 internal void voronoi_test() {
@@ -279,32 +304,8 @@ internal void voronoi_test() {
             }
         }
     }
-    
-    Image_u32 positive_distance_field = produce_distance_field(&image_source, 8);
-    
-    for (u32 y = 0; y < image_source.height; ++y) {
-        for (u32 x = 0; x < image_source.width; ++x) {
-            Color_ARGB* pixel = (Color_ARGB*)get_pixel_pointer(&image_source, x, y);
-            pixel->a = (255 - pixel->a);
-        }
-    }
-    
-    Image_u32 negative_distance_field = produce_distance_field(&image_source, 8);
-    
-    write_image("positive_distance_field.bmp", &positive_distance_field);
-    write_image("negative_distance_field.bmp", &negative_distance_field);
-    
-    Image_u32 sdf = allocate_image(N, N);
-    
-    for (u32 y = 0; y < sdf.height; ++y) {
-        for (u32 x = 0; x < sdf.width; ++x) {
-            u8 positive = (Color_ARGB) { .argb = get_pixel(&positive_distance_field, x, y) }.r;
-            u8 negative = (Color_ARGB) { .argb = get_pixel(&negative_distance_field, x, y) }.r;
-            u8 combined = (255 - positive) / 2 + negative / 2;
-            set_pixel(&sdf, x, y, (Color_ARGB) { .r = combined, .g = combined, .b = combined, .a = 255 });
-        }
-    }
-    
+
+    Image_u32 sdf = produce_signed_distance_field(&image_source, 8);
     write_image("signed_distance_field.bmp", &sdf);
 }
 
