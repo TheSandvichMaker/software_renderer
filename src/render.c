@@ -259,7 +259,6 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
 internal void voronoi_test() {
     enum { N = 512 };
     Image_u32 image_source = allocate_image(N, N);
-    clear_image(&image_source, (Color_ARGB) { .a = 255 });
     
     char a[] = {
         0, 0, 1, 0, 0,
@@ -276,23 +275,12 @@ internal void voronoi_test() {
             u32 read_y = 4 - 5*(y - margin) / (image_source.height - 2*margin);
             char read_pixel = a[read_y*5 + read_x];
             if (read_pixel) {
-                set_pixel(&image_source, x, y, (Color_ARGB) { .r = 255, .g = 255, .b = 255, .a = 255 });
+                set_pixel(&image_source, x, y, (Color_ARGB) { .a = 255 });
             }
         }
     }
     
-    write_image("A.bmp", &image_source);
-    
     Image_u32 positive_distance_field = produce_distance_field(&image_source, 8);
-    for (u32 y = 0; y < positive_distance_field.height; ++y) {
-        for (u32 x = 0; x < positive_distance_field.width; ++x) {
-            Color_ARGB* pixel = (Color_ARGB*)get_pixel_pointer(&positive_distance_field, x, y);
-            pixel->r = (255 - pixel->r);
-            pixel->g = (255 - pixel->g);
-            pixel->b = (255 - pixel->b);
-        }
-    }
-    
     
     for (u32 y = 0; y < image_source.height; ++y) {
         for (u32 x = 0; x < image_source.width; ++x) {
