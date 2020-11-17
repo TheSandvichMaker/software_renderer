@@ -88,8 +88,8 @@ typedef intptr_t  smm;
 #define DllIsEmpty(s) ((s)->next == (s))
 
 #define ForDllUnique(it, sentinel, next, prev) for (auto prev_##it = (sentinel), it = (sentinel)->next; \
-                                                    it != (sentinel);                                   \
-                                                    prev_##it = prev_##it->next, it = prev_##it->next)
+it != (sentinel);                                   \
+prev_##it = prev_##it->next, it = prev_##it->next)
 #define ForDll(it, sentinel) ForDllUnique(it, sentinel, next, prev)
 
 #define Paste(a, b) a##b
@@ -123,11 +123,11 @@ typedef intptr_t  smm;
 #define sizeof_member(struct_type, member) sizeof(((struct_type*)0)->member)
 
 #define define_safe_truncate(big, small, min, max)             \
-    inline small safe_truncate_##big##_##small(big source) {   \
-        Assert(source >= min && source <= max);                \
-        small result = (small)source;                          \
-        return result;                                         \
-    }
+inline small safe_truncate_##big##_##small(big source) {   \
+Assert(source >= min && source <= max);                \
+small result = (small)source;                          \
+return result;                                         \
+}
 
 define_safe_truncate(u64, u32, 0, UINT32_MAX);
 define_safe_truncate(u64, u16, 0, UINT16_MAX);
@@ -148,10 +148,10 @@ define_safe_truncate(f64, f32, -FLT_MAX , FLT_MAX);
 #undef define_safe_truncate
 
 #define define_saturating_cast(big, small, min, max)             \
-    inline small saturating_cast_##big##_##small(big source) {   \
-        small result = (small)Clamp(source, min, max);           \
-        return result;                                           \
-    }
+inline small saturating_cast_##big##_##small(big source) {   \
+small result = (small)Clamp(source, min, max);           \
+return result;                                           \
+}
 
 define_saturating_cast(u64, u32, 0, UINT32_MAX);
 define_saturating_cast(u64, u16, 0, UINT16_MAX);

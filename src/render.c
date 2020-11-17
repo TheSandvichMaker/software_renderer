@@ -37,7 +37,7 @@ internal String_u8 read_entire_file(char* file_name, b32 null_terminate) {
     return result;
 }
 
-internal void plot_line(Image_u32 image, V2i p0, V2i p1, Color_ARGB color) {
+internal void plot_line(Image_u32* image, V2i p0, V2i p1, Color_ARGB color) {
     s32 x0 = p0.x;
     s32 y0 = p0.y;
     s32 x1 = p1.x;
@@ -72,10 +72,25 @@ internal void plot_line(Image_u32 image, V2i p0, V2i p1, Color_ARGB color) {
     }
 }
 
-internal void plot_triangle(Image_u32 image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
+internal void plot_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
     plot_line(image, p0, p1, color);
     plot_line(image, p1, p2, color);
     plot_line(image, p2, p0, color);
+}
+
+internal void bayercentric(V2i a, V2i b, V2i c, V2i p, f32* u, f32* v, f32* w) {
+    V2 v0 = vector_convert(V2, (b - a));
+    V2 v1 = vector_convert(V2, (c - a));
+    V2 v2 = vector_convert(V2, (p - a));
+    f32 d00 = v2_dot(v0, v0);
+    f32 d01 = v2_dot(v0, v1);
+    f32 d11 = v2_dot(v1, v1);
+    f32 d20 = v2_dot(v2, v0);
+    f32 d21 = v2_dot(v2, v1);
+    f32 denom = d00*d11 - d01*d01;
+    *v = (d11*d20 - d01*d21) / denom;
+    *w = (d00*d21 - d01*d20) / denom;
+    *u = (1.0f - *v - *w);
 }
 
 typedef struct SlopeData {
@@ -90,7 +105,7 @@ internal void fill_slope_data(V2i p0, V2i p1, SlopeData* data) {
     data->x      = (f32)p0.x;
 }
 
-internal void rasterize_triangle(Image_u32 image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
+internal void rasterize_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
     if (p1.y < p0.y) { Swap(V2i, p0, p1); }
     if (p2.y < p0.y) { Swap(V2i, p0, p2); }
     if (p2.y < p1.y) { Swap(V2i, p1, p2); }
@@ -117,7 +132,9 @@ internal void rasterize_triangle(Image_u32 image, V2i p0, V2i p1, V2i p2, Color_
             }
             
             for (s32 x = (s32)slope_data[0].x; x < (s32)slope_data[1].x; ++x) {
-                set_pixel(image, x, y, color);
+                f32 u, v, w;
+                bayercentric(p0, p1, p2, v2i(x, y), &u, &v, &w);
+                set_pixel(image, x, y, rgb((s32)(255.0f*u), (s32)(255.0f*v), (s32)(255.0f*w)));
             }
             
             slope_data[0].x += slope_data[0].step;
@@ -126,45 +143,142 @@ internal void rasterize_triangle(Image_u32 image, V2i p0, V2i p1, V2i p2, Color_
     }
 }
 
+internal void draw_mesh(Image_u32* image, Mesh* mesh) {
+    for (u32 triangle_index = 0; triangle_index < mesh->triangle_count; ++triangle_index) {
+        Triangle* t = mesh->triangles + triangle_index;
+        V2i screen_coords[3];
+        for (u32 vert_index = 0; vert_index < 3; ++vert_index) {
+            V3 v0 = mesh->vertices[t->e[vert_index]];
+            s32 x0 = (s32)(0.5f*image->width*(v0.x + 1.0f));
+            s32 y0 = (s32)(0.5f*image->height*(v0.y + 1.0f));
+            screen_coords[vert_index] = v2i(x0, y0);
+        }
+        rasterize_triangle(image, screen_coords[0], screen_coords[1], screen_coords[2], rgb(rand() % 255,
+                                                                                            rand() % 255,
+                                                                                            rand() % 255));
+    }
+}
+
+u32 u32_log2(u32 n) {
+    // https://stackoverflow.com/questions/994593/how-to-do-an-integer-log2-in-c
+#define S(k) if (n >= (1 << k)) { i += k; n >>= k; }
+    u32 i = -(n == 0);
+    S(16); S(8); S(4); S(2); S(1);
+    return i;
+#undef S
+}
+
+internal void voronoi_test() {
+    enum { N = 128 };
+    
+    u32 image_count = 0;
+    Image_u32 image_array[16] = {};
+    
+    Image_u32 image_a = allocate_image(N, N);
+    Image_u32 image_b = allocate_image(N, N);
+    
+    set_pixel(&image_a, 4*8, 4*16, rgb(4*8, 4*16, 0));
+    set_pixel(&image_a, 4*2, 4*18, rgb(4*2, 4*18, 0));
+    set_pixel(&image_a, 4*25, 4*28, rgb(4*25, 4*28, 0));
+    set_pixel(&image_a, 4*12, 4*6, rgb(4*12, 4*6, 0));
+    
+    Image_u32* image_read  = &image_a;
+    Image_u32* image_write = &image_b;
+    
+    u32 N_log2 = u32_log2(N);
+    for (u32 pass_index = 0; pass_index < N_log2; ++pass_index) {
+        s32 offset = (s32)(1 << (N_log2 - pass_index - 1));
+        
+        struct { s32 x, y; } pairs[] = {
+            { .x = -offset, .y = -offset }, { .x = 0, .y = -offset }, { .x = offset, .y = -offset },
+            { .x = -offset, .y = 0       }, { .x = 0, .y = 0       }, { .x = offset, .y = 0       },
+            { .x = -offset, .y = offset  }, { .x = 0, .y = offset  }, { .x = offset, .y = offset  },
+        };
+        
+        for (u32 y = 0; y < image_read->height; ++y) {
+            for (u32 x = 0; x < image_read->width; ++x) {
+                u32 closest_distance = UINT32_MAX;
+                u32 closest_x = UINT32_MAX;
+                u32 closest_y = UINT32_MAX;
+                
+                for (u32 pair_index = 0; pair_index < 9; ++pair_index) {
+                    s32 read_x = (s32)x + pairs[pair_index].x;
+                    s32 read_y = (s32)y + pairs[pair_index].y;
+                    if (read_x < 0)                        { read_x = 0; }
+                    if (read_x >= (s32)image_read->width)  { read_x = image_read->width - 1; }
+                    if (read_y < 0)                        { read_y = 0; }
+                    if (read_y >= (s32)image_read->height) { read_x = image_read->height - 1; }
+                    
+                    Color_ARGB pixel = get_pixel(image_read, read_x, read_y);
+                    if (pixel.r || pixel.g) {
+                        s32 diff_x = (s32)pixel.r - (s32)x;
+                        s32 diff_y = (s32)pixel.g - (s32)y;
+                        u32 distance_sq = diff_x*diff_x + diff_y*diff_y;
+                        if (closest_distance > distance_sq) {
+                            closest_distance = distance_sq;
+                            closest_x = pixel.r;
+                            closest_y = pixel.g;
+                        }
+                    }
+                }
+                
+                if ((closest_x != UINT32_MAX) &&
+                    (closest_y != UINT32_MAX))
+                {
+                    set_pixel(image_write, x, y, rgb(closest_x, closest_y, 0));
+                }
+            }
+        }
+        
+        copy_image(image_write, image_read);
+        Swap(Image_u32*, image_read, image_write);
+        
+        image_array[image_count++] = clone_image(image_read);
+    }
+    
+    for (u32 image_index = 0; image_index < image_count; ++image_index) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "debug_image_%d.bmp", image_index);
+        
+        write_image(buf, &image_array[image_index]);
+        free_image(&image_array[image_index]);
+    }
+    
+    write_image("voronoi.bmp", image_read);
+    
+    for (u32 y = 0; y < image_read->height; ++y) {
+        for (u32 x = 0; x < image_read->width; ++x) {
+            Color_ARGB pixel = get_pixel(image_read, x, y);
+            s32 diff_x = (s32)pixel.r - (s32)x;
+            s32 diff_y = (s32)pixel.g - (s32)y;
+            u32 distance_sq = diff_x*diff_x + diff_y*diff_y;
+            f32 distance = sqrt((f32)distance_sq);
+            u32 write_distance = (u32)(255*(distance / (f32)N));
+            if (write_distance < 0)   { write_distance = 0; }
+            if (write_distance > 255) { write_distance = 255; }
+            set_pixel(image_write, x, y, rgb(write_distance, write_distance, write_distance));
+        }
+    }
+    
+    write_image("distance_field.bmp", image_write);
+}
+
 #include <time.h>
 
 int main(int argc, char** argv) {
+#if 0
     Image_u32 image = allocate_image(512, 512);
-    clear_image(image, rgb(0, 0, 0));
+    clear_image(&image, rgb(0, 0, 0));
     
-#if 1
     String_u8 obj = read_entire_file("african_head.obj", false);
     
     Mesh mesh;
     if (parse_obj(obj, &mesh)) {
-        clock_t timer = clock();
-        
-        for (u32 i = 0; i < 10000; ++i) {
-            for (u32 triangle_index = 0; triangle_index < mesh.triangle_count; ++triangle_index) {
-                Triangle* t = mesh.triangles + triangle_index;
-                V2i screen_coords[3];
-                for (u32 vert_index = 0; vert_index < 3; ++vert_index) {
-                    V3 v0 = mesh.vertices[t->e[vert_index]];
-                    s32 x0 = (s32)(0.5f*image.width*(v0.x + 1.0f));
-                    s32 y0 = (s32)(0.5f*image.height*(v0.y + 1.0f));
-                    screen_coords[vert_index] = v2i(x0, y0);
-                }
-                rasterize_triangle(image, screen_coords[0], screen_coords[1], screen_coords[2], rgb(rand() % 255, rand() % 255, rand() % 255));
-            }
-        }
-        
-        clock_t elapsed = clock() - timer;
-        printf("Clocks elapsed: %llu", (u64)elapsed);
+        draw_mesh(&image, &mesh);
     }
+    
+    write_image("test.bmp", &image);
 #else
-    V2i t0[3] = { v2i(10, 70),   v2i(50, 160),  v2i(70, 80)   }; 
-    V2i t1[3] = { v2i(180, 50),  v2i(150, 1),   v2i(70, 180)  }; 
-    V2i t2[3] = { v2i(180, 150), v2i(120, 160), v2i(130, 180) };
-    
-    rasterize_triangle(image, t0[0], t0[1], t0[2], rgb(255, 0, 0));
-    rasterize_triangle(image, t1[0], t1[1], t1[2], rgb(255, 255, 255));
-    rasterize_triangle(image, t2[0], t2[1], t2[2], rgb(0, 255, 0));
+    voronoi_test();
 #endif
-    
-    write_image("test.bmp", image);
 }

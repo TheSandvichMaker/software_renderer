@@ -4,6 +4,8 @@
 #define RENDER_H
 
 #include <stdio.h>
+#include <string.h>
+#include <math.h>
 
 //
 //
@@ -22,6 +24,9 @@
 //
 //
 //
+
+void* global_heap_alloc(umm size);
+void global_heap_free(void* ptr);
 
 #include "image.h"
 #include "obj.h"

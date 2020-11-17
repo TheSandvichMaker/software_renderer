@@ -16,21 +16,26 @@ internal Color_ARGB rgb(u8 r, u8 g, u8 b) {
     return result;
 }
 
-internal u32 get_total_pixel_size(Image_u32 image) {
-    u32 result = sizeof(u32)*image.width*image.height;
+internal u32 get_total_pixel_size(Image_u32* image) {
+    u32 result = sizeof(u32)*image->width*image->height;
     return result;
 }
 
-internal u32* get_pixel_pointer(Image_u32 image, u32 x, u32 y) {
-    u32* result = image.pixels + y*image.width + x;
+internal u32* get_pixel_pointer(Image_u32* image, u32 x, u32 y) {
+    u32* result = image->pixels + y*image->width + x;
     return result;
 }
 
-internal void set_pixel(Image_u32 image, u32 x, u32 y, Color_ARGB color) {
-    image.pixels[y*image.width + x] = color.argb;
+internal Color_ARGB get_pixel(Image_u32* image, u32 x, u32 y) {
+    u32 result = image->pixels[y*image->width + x];
+    return (Color_ARGB) { .argb = result };
 }
 
-internal void write_image(char* file_name, Image_u32 image) {
+internal void set_pixel(Image_u32* image, u32 x, u32 y, Color_ARGB color) {
+    image->pixels[y*image->width + x] = color.argb;
+}
+
+internal void write_image(char* file_name, Image_u32* image) {
     u32 pixel_size = get_total_pixel_size(image);
     
     Bitmap_Header header = {};
@@ -38,8 +43,8 @@ internal void write_image(char* file_name, Image_u32 image) {
     header.file_size        = sizeof(header) + pixel_size;
     header.bitmap_offset    = sizeof(header);
     header.size             = sizeof(header) - 14;
-    header.width            = image.width;
-    header.height           = image.height;
+    header.width            = image->width;
+    header.height           = image->height;
     header.planes           = 1;
     header.bits_per_pixel   = 32;
     header.compression      = 0;
@@ -52,7 +57,7 @@ internal void write_image(char* file_name, Image_u32 image) {
     FILE* out_file = fopen(file_name, "wb");
     if (out_file) {
         fwrite(&header, sizeof(header), 1, out_file);
-        fwrite(image.pixels, pixel_size, 1, out_file);
+        fwrite(image->pixels, pixel_size, 1, out_file);
         fclose(out_file);
     } else {
         fprintf(stderr, "error: Unable to write output file %s.\n", file_name);
@@ -64,15 +69,33 @@ internal Image_u32 allocate_image(u32 width, u32 height) {
     image.width = width;
     image.height = height;
     
-    u32 pixel_size = get_total_pixel_size(image);
+    u32 pixel_size = get_total_pixel_size(&image);
     image.pixels = (u32*)malloc(pixel_size);
+    memset(image.pixels, 0, pixel_size);
     
     return image;
 }
 
-internal void clear_image(Image_u32 image, Color_ARGB color) {
-    u32* at  = image.pixels;
-    u32* end = get_pixel_pointer(image, image.width, image.height);
+internal void free_image(Image_u32* image) {
+    free(image->pixels);
+    memset(image, 0, sizeof(*image));
+}
+
+internal void copy_image(Image_u32* src, Image_u32* dst) {
+    Assert((src->width == dst->width) &&
+           (src->height == dst->height));
+    memcpy(dst->pixels, src->pixels, get_total_pixel_size(src));
+}
+
+internal Image_u32 clone_image(Image_u32* src) {
+    Image_u32 dst = allocate_image(src->width, src->height);
+    copy_image(src, &dst);
+    return dst;
+}
+
+internal void clear_image(Image_u32* image, Color_ARGB color) {
+    u32* at  = image->pixels;
+    u32* end = get_pixel_pointer(image, image->width, image->height);
     while (at != end) {
         *at++ = color.argb;
     }
