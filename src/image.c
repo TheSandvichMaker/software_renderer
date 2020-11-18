@@ -83,7 +83,7 @@ internal void free_image(Image_u32* image) {
 
 internal void copy_image(Image_u32* src, Image_u32* dst) {
     Assert((src->width == dst->width) &&
-           (src->height == dst->height));
+           (src->height <= dst->height));
     memcpy(dst->pixels, src->pixels, get_total_pixel_size(src));
 }
 

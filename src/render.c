@@ -82,11 +82,11 @@ internal void bayercentric(V2i a, V2i b, V2i c, V2i p, f32* u, f32* v, f32* w) {
     V2 v0 = vector_convert(V2, (b - a));
     V2 v1 = vector_convert(V2, (c - a));
     V2 v2 = vector_convert(V2, (p - a));
-    f32 d00 = v2_dot(v0, v0);
-    f32 d01 = v2_dot(v0, v1);
-    f32 d11 = v2_dot(v1, v1);
-    f32 d20 = v2_dot(v2, v0);
-    f32 d21 = v2_dot(v2, v1);
+    f32 d00 = dot(v0, v0);
+    f32 d01 = dot(v0, v1);
+    f32 d11 = dot(v1, v1);
+    f32 d20 = dot(v2, v0);
+    f32 d21 = dot(v2, v1);
     f32 denom = d00*d11 - d01*d01;
     *v = (d11*d20 - d01*d21) / denom;
     *w = (d00*d21 - d01*d20) / denom;
@@ -174,11 +174,11 @@ typedef enum DistanceFieldType {
 } DistanceFieldType;
 
 internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplier, DistanceFieldType type) {
-    Image_u32 temp_image_a = allocate_image(src->width, src->height);
-    Image_u32 temp_image_b = allocate_image(src->width, src->height);
+    Image_u32 image_a = allocate_image(src->width, src->height);
+    Image_u32 image_b = allocate_image(src->width, src->height);
     
-    Image_u32* image_read  = &temp_image_a;
-    Image_u32* image_write = &temp_image_b;
+    Image_u32* image_read  = &image_a;
+    Image_u32* image_write = &image_b;
     
     for (u32 y = 0; y < image_read->height; ++y) {
         for (u32 x = 0; x < image_read->width; ++x) {
@@ -196,10 +196,10 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
     for (u32 pass_index = 0; pass_index < N_log2; ++pass_index) {
         s32 offset = (s32)(1 << (N_log2 - pass_index - 1));
         
-        struct { s32 x, y; } pairs[] = {
-            { .x = -offset, .y = -offset }, { .x = 0, .y = -offset }, { .x = offset, .y = -offset },
-            { .x = -offset, .y = 0       }, { .x = 0, .y = 0       }, { .x = offset, .y = 0       },
-            { .x = -offset, .y = offset  }, { .x = 0, .y = offset  }, { .x = offset, .y = offset  },
+        V2i pairs[] = {
+            { -offset, -offset }, { 0, -offset }, { offset, -offset },
+            { -offset, 0       }, { 0, 0       }, { offset, 0       },
+            { -offset, offset  }, { 0, offset  }, { offset, offset  },
         };
         
         for (u32 y = 0; y < image_read->height; ++y) {
