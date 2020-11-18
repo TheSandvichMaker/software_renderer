@@ -52,6 +52,7 @@ typedef intptr_t  smm;
 #define internal      static
 #define global        static
 #define local_persist static
+#define auto __auto_type
 
 #if MY_DEBUG
 #define Assert(expression) (!(expression) ? *(volatile int*)0 = 0 : 0)
@@ -76,9 +77,9 @@ typedef intptr_t  smm;
 #define SllQueuePush(f, l, n) ((n)->next = 0, ((f) ? (l)->next = (n) : (f) = (n)), (l) = (n))
 #define SllQueuePop(f, l, n) f; (SllStackPop_(f), ((f) ? 0 : (l) = 0))
 
-#define ForSllUnique(it, head, next) for (auto* it = head; it; it = it->next)
+#define ForSllUnique(it, head, next) for (auto it = head; it; it = it->next)
 #define ForSll(it, head) ForSllUnique(it, head, next)
-#define ForSllOuterUnique(it_at, head, next) for (auto** it_at = &(head); *it_at; it_at = &(*it_at)->next)
+#define ForSllOuterUnique(it_at, head, next) for (auto it_at = &(head); *it_at; it_at = &(*it_at)->next)
 #define ForSllOuter(it_at, head) ForSllOuterUnique(it_at, head, next)
 
 #define DllInit(s) ((s)->next = s, (s)->prev = s)
@@ -171,7 +172,7 @@ define_saturating_cast(f64, f32, -FLT_MAX , FLT_MAX);
 
 #undef define_saturating_cast
 
-#define Swap(t, a, b) { t _swap_temp = a; a = b; b = _swap_temp; }
+#define Swap(a, b) { auto _swap_temp = a; a = b; b = _swap_temp; }
 #define Unique(x) Paste(x, __LINE__)
 
 #endif /* SD_COMMON_H */

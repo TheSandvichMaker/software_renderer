@@ -8,7 +8,8 @@
 #include "image.c"
 #include "obj.c"
 
-internal String_u8 read_entire_file(char* file_name, b32 null_terminate) {
+function
+String_u8 read_entire_file(char* file_name, b32 null_terminate) {
     String_u8 result = {};
     
     FILE* in = fopen(file_name, "rb");
@@ -37,7 +38,8 @@ internal String_u8 read_entire_file(char* file_name, b32 null_terminate) {
     return result;
 }
 
-internal void plot_line(Image_u32* image, V2i p0, V2i p1, Color_ARGB color) {
+function
+void plot_line(Image_u32* image, V2i p0, V2i p1, Color_ARGB color) {
     s32 x0 = p0.x;
     s32 y0 = p0.y;
     s32 x1 = p1.x;
@@ -72,13 +74,15 @@ internal void plot_line(Image_u32* image, V2i p0, V2i p1, Color_ARGB color) {
     }
 }
 
-internal void plot_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
+function
+void plot_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
     plot_line(image, p0, p1, color);
     plot_line(image, p1, p2, color);
     plot_line(image, p2, p0, color);
 }
 
-internal void bayercentric(V2i a, V2i b, V2i c, V2i p, f32* u, f32* v, f32* w) {
+function
+void bayercentric(V2i a, V2i b, V2i c, V2i p, f32* u, f32* v, f32* w) {
     V2 v0 = vector_convert(V2, (b - a));
     V2 v1 = vector_convert(V2, (c - a));
     V2 v2 = vector_convert(V2, (p - a));
@@ -99,16 +103,18 @@ typedef struct SlopeData {
     f32 x;
 } SlopeData;
 
-internal void fill_slope_data(V2i p0, V2i p1, SlopeData* data) {
+function
+void fill_slope_data(V2i p0, V2i p1, SlopeData* data) {
     data->height = (p1.y - p0.y);
     data->step   = (f32)(p1.x - p0.x) / (f32)data->height;
     data->x      = (f32)p0.x;
 }
 
-internal void rasterize_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
-    if (p1.y < p0.y) { Swap(V2i, p0, p1); }
-    if (p2.y < p0.y) { Swap(V2i, p0, p2); }
-    if (p2.y < p1.y) { Swap(V2i, p1, p2); }
+function
+void rasterize_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color_ARGB color) {
+    if (p1.y < p0.y) { Swap(p0, p1); }
+    if (p2.y < p0.y) { Swap(p0, p2); }
+    if (p2.y < p1.y) { Swap(p1, p2); }
     
     if (p0.y != p2.y) {
         b32 short_side = (p1.y - p0.y)*(p2.x - p0.x) < (p2.y - p0.y)*(p1.x - p0.x);
@@ -143,7 +149,7 @@ internal void rasterize_triangle(Image_u32* image, V2i p0, V2i p1, V2i p2, Color
     }
 }
 
-internal void draw_mesh(Image_u32* image, Mesh* mesh) {
+function void draw_mesh(Image_u32* image, Mesh* mesh) {
     for (u32 triangle_index = 0; triangle_index < mesh->triangle_count; ++triangle_index) {
         Triangle* t = mesh->triangles + triangle_index;
         V2i screen_coords[3];
@@ -159,7 +165,8 @@ internal void draw_mesh(Image_u32* image, Mesh* mesh) {
     }
 }
 
-internal u32 u32_log2(u32 n) {
+function
+u32 u32_log2(u32 n) {
     // https://stackoverflow.com/questions/994593/how-to-do-an-integer-log2-in-c
 #define S(k) if (n >= (1 << k)) { i += k; n >>= k; }
     u32 i = -(n == 0);
@@ -173,7 +180,8 @@ typedef enum DistanceFieldType {
     DistanceField_Inner,
 } DistanceFieldType;
 
-internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplier, DistanceFieldType type) {
+function
+Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplier, DistanceFieldType type) {
     Image_u32 image_a = allocate_image(src->width, src->height);
     Image_u32 image_b = allocate_image(src->width, src->height);
     
@@ -238,7 +246,7 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
         }
         
         copy_image(image_write, image_read);
-        Swap(Image_u32*, image_read, image_write);
+        Swap(image_read, image_write);
     }
     
     for (u32 y = 0; y < image_read->height; ++y) {
@@ -262,7 +270,8 @@ internal Image_u32 produce_distance_field(Image_u32* src, u32 bullshit_multiplie
     return result;
 }
 
-internal Image_u32 produce_signed_distance_field(Image_u32* src, u32 bullshit_multiplier) {
+function
+Image_u32 produce_signed_distance_field(Image_u32* src, u32 bullshit_multiplier) {
     Image_u32 positive_distance_field = produce_distance_field(src, 8, DistanceField_Outer);
     Image_u32 negative_distance_field = produce_distance_field(src, 8, DistanceField_Inner);
     
@@ -281,7 +290,8 @@ internal Image_u32 produce_signed_distance_field(Image_u32* src, u32 bullshit_mu
     return positive_distance_field;
 }
 
-internal void voronoi_test() {
+function
+void voronoi_test(void) {
     enum { N = 512 };
     Image_u32 image_source = allocate_image(N, N);
     

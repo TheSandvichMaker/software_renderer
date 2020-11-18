@@ -11,7 +11,18 @@
 //
 //
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <float.h>
+
+//
+
 #include "sd_common.h"
+#define overload      __attribute__((overloadable))
+#define force_inline  __attribute__((always_inline))
+#define function      static overload
+
 #include "sd_stretchy_buffer.h"
 
 #define SD_MATH_STATIC

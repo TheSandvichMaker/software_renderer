@@ -1,4 +1,5 @@
-internal Color_ARGB rgba(u8 r, u8 g, u8 b, u8 a) {
+function
+Color_ARGB rgba(u8 r, u8 g, u8 b, u8 a) {
     Color_ARGB result;
     result.r = r;
     result.g = g;
@@ -7,7 +8,8 @@ internal Color_ARGB rgba(u8 r, u8 g, u8 b, u8 a) {
     return result;
 }
 
-internal Color_ARGB rgb(u8 r, u8 g, u8 b) {
+function
+Color_ARGB rgb(u8 r, u8 g, u8 b) {
     Color_ARGB result;
     result.r = r;
     result.g = g;
@@ -16,26 +18,31 @@ internal Color_ARGB rgb(u8 r, u8 g, u8 b) {
     return result;
 }
 
-internal u32 get_total_pixel_size(Image_u32* image) {
+function
+u32 get_total_pixel_size(Image_u32* image) {
     u32 result = sizeof(u32)*image->width*image->height;
     return result;
 }
 
-internal u32* get_pixel_pointer(Image_u32* image, u32 x, u32 y) {
+function
+u32* get_pixel_pointer(Image_u32* image, u32 x, u32 y) {
     u32* result = image->pixels + y*image->width + x;
     return result;
 }
 
-internal u32 get_pixel(Image_u32* image, u32 x, u32 y) {
+function
+u32 get_pixel(Image_u32* image, u32 x, u32 y) {
     u32 result = image->pixels[y*image->width + x];
     return result;
 }
 
-internal void set_pixel(Image_u32* image, u32 x, u32 y, Color_ARGB color) {
+function
+void set_pixel(Image_u32* image, u32 x, u32 y, Color_ARGB color) {
     image->pixels[y*image->width + x] = color.argb;
 }
 
-internal void write_image(char* file_name, Image_u32* image) {
+function
+void write_image(char* file_name, Image_u32* image) {
     u32 pixel_size = get_total_pixel_size(image);
     
     Bitmap_Header header = {};
@@ -64,7 +71,8 @@ internal void write_image(char* file_name, Image_u32* image) {
     }
 }
 
-internal Image_u32 allocate_image(u32 width, u32 height) {
+function
+Image_u32 allocate_image(u32 width, u32 height) {
     Image_u32 image = {};
     image.width = width;
     image.height = height;
@@ -76,24 +84,28 @@ internal Image_u32 allocate_image(u32 width, u32 height) {
     return image;
 }
 
-internal void free_image(Image_u32* image) {
+function
+void free_image(Image_u32* image) {
     free(image->pixels);
     memset(image, 0, sizeof(*image));
 }
 
-internal void copy_image(Image_u32* src, Image_u32* dst) {
+function
+void copy_image(Image_u32* src, Image_u32* dst) {
     Assert((src->width == dst->width) &&
            (src->height <= dst->height));
     memcpy(dst->pixels, src->pixels, get_total_pixel_size(src));
 }
 
-internal Image_u32 clone_image(Image_u32* src) {
+function
+Image_u32 clone_image(Image_u32* src) {
     Image_u32 dst = allocate_image(src->width, src->height);
     copy_image(src, &dst);
     return dst;
 }
 
-internal void clear_image(Image_u32* image, Color_ARGB color) {
+function
+void clear_image(Image_u32* image, Color_ARGB color) {
     u32* at  = image->pixels;
     u32* end = get_pixel_pointer(image, image->width, image->height);
     while (at != end) {
